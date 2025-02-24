@@ -13,7 +13,7 @@ from pyqtgraph.Qt import QtWidgets, QtCore
 port = 'COM4'             # Change this to the port name of the Arduino you are using.
 baudrate = 115200         # Change to the Baudrate you are using in the Arduino code.
 sample_rate = 3200        # Actual sampling rate [50, 100, 200, 400, 800, 1000, 1600, 3200]
-average_count = 32        # Sample average count [1, 2, 4, 8, 16, 32]
+average_count = 1        # Sample average count [1, 2, 4, 8, 16, 32]
 pulse_width = 18          # Pulse width [15, 16, 17, 18]
 #################################   end of parameters you need to edit       ################################################################################
 
