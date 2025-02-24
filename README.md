@@ -49,7 +49,7 @@ You can install them using `pip` by running the following command:
 
 ```bash
 pip install seaborn matplotlib pandas pyserial numpy pyqtgraph
-
+```
 ## Some Notes
 
 - If you are getting the values `-1`, try pressing the Arduino reset button (the only one) and wait a few seconds.
