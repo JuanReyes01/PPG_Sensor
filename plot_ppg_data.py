@@ -15,7 +15,7 @@ from pyqtgraph.Qt import QtWidgets, QtCore
 #################################  parameters you might need to change based on your Arduino code       #################################################
 port = 'COM4'             # Change this to the port name of the Arduino you are using.
 baudrate = 115200         # Change to the Baudrate you are using in the Arduino code.
-sample_rate = 400        # Actual sampling rate [50, 100, 200, 400, 800, 1000, 1600, 3200]
+sample_rate = 400         # Actual sampling rate [50, 100, 200, 400, 800, 1000, 1600, 3200]
 average_count = 1         # Sample average count [1, 2, 4, 8, 16, 32]
 pulse_width = 18          # Pulse width [15, 16, 17, 18]
 #################################   end of parameters you need to edit       ################################################################################
@@ -23,7 +23,7 @@ pulse_width = 18          # Pulse width [15, 16, 17, 18]
 
 class SerialThread(Thread):
     """
-    Thread for reading from the serial port. It now duplicates each sensor sample
+    Thread for reading from the serial port. It duplicates each sensor sample
     into two separate queues: one for CSV logging and one for plotting.
     """
     def __init__(self, csv_queue, plot_queue, message_queue, command_queue):
@@ -115,11 +115,18 @@ class SerialThread(Thread):
                 else:
                     # If the line does not match the expected "timestamp,value" format,
                     # assume it's a non-numeric message.
-                    self.message_queue.put(line)
+                    if line.startswith("RESET"):
+                        self.message_queue.put("Arduino reset detected")
+                        self.message_queue.put("Emptying queues and restarting...")
+                        # Inject the RESET marker into both queues.
+                        self.csv_queue.put("RESET")
+                        self.plot_queue.put("RESET")
+                    else:
+                        self.message_queue.put(line)
+
             except Exception as e:
                 self.message_queue.put(f"Serial read error: {str(e)}")
                 break
-
 
     def stop(self):
         """Signal the thread to stop."""
@@ -129,7 +136,7 @@ class SerialThread(Thread):
 class CSVThread(Thread):
     """
     Thread for handling CSV file writing.
-    It now reads from its dedicated queue so it doesn't interfere with the plot.
+    It reads from its dedicated queue so it doesn't interfere with the plot.
     """
     def __init__(self, csv_queue, filename='ppg_data.csv'):
         super().__init__()
@@ -137,23 +144,33 @@ class CSVThread(Thread):
         self.filename = filename
         self.running = Event()
         self.running.set()
-        self.start_time = time.time()
+        self.header = ["Time (s)", "PPG Value"]
 
     def run(self):
         try:
+            # Open the file once; when RESET occurs, we clear its contents.
             with open(self.filename, 'w', newline='') as csv_file:
                 writer = csv.writer(csv_file)
-                writer.writerow(["Time (s)", "PPG Value"])
+                writer.writerow(self.header)
+                csv_file.flush()
                 while self.running.is_set() or not self.csv_queue.empty():
                     try:
-                        timestamp, value = self.csv_queue.get(timeout=0.1)
-                        # Write the Arduino timestamp directly:
+                        item = self.csv_queue.get(timeout=0.1)
+                        # Check for the special RESET marker.
+                        if item == "RESET":
+                            # Reset the CSV file: clear file and write header.
+                            csv_file.seek(0)
+                            csv_file.truncate()
+                            writer.writerow(self.header)
+                            csv_file.flush()
+                            continue
+                        timestamp, value = item
                         writer.writerow([timestamp, value])
+                        csv_file.flush()
                     except queue.Empty:
                         continue
         except Exception as e:
             print(f"CSV error: {str(e)}")
-
 
     def stop(self):
         """Signal the thread to stop."""
@@ -191,20 +208,19 @@ class MainWindow(pg.GraphicsLayoutWidget):
         self.resize(800, 500)
         self.setWindowTitle('Live PPG Data Plotter (Press Q to Quit)')
 
-        # Create plot area
+        # Create plot area.
         self.plot = self.addPlot(title="PPG Data")
         self.plot.setLabel('left', "PPG Signal", units='a.u.')
         self.plot.setLabel('bottom', "Time (s)")
         self.curve = self.plot.plot(pen='y')
 
-        # Data buffers using deque for a fixed-length rolling window
-        self.max_points = 1000  # Number of points to display
+        # Data buffers using deque for a fixed-length rolling window.
+        self.max_points = 1000  # Number of points to display.
         self.data_buffer = deque(maxlen=self.max_points)
         self.x_buffer = deque(maxlen=self.max_points)
 
-        # Store the first timestamp to create a relative time axis
+        # Store the first timestamp to create a relative time axis.
         self.first_timestamp = None
-
 
     def keyPressEvent(self, event):
         """Handle key presses (Q to quit)."""
@@ -218,7 +234,15 @@ class MainWindow(pg.GraphicsLayoutWidget):
         """Update the plot with new data from the plot queue."""
         while not self.plot_queue.empty():
             try:
-                timestamp, value = self.plot_queue.get_nowait()
+                item = self.plot_queue.get_nowait()
+                # Check for the RESET marker.
+                if item == "RESET":
+                    # Clear plot buffers and reset the reference timestamp.
+                    self.data_buffer.clear()
+                    self.x_buffer.clear()
+                    self.first_timestamp = None
+                    continue
+                timestamp, value = item
                 # Initialize first_timestamp if not set.
                 if self.first_timestamp is None:
                     self.first_timestamp = timestamp
@@ -229,7 +253,6 @@ class MainWindow(pg.GraphicsLayoutWidget):
             except queue.Empty:
                 break
         self.curve.setData(np.array(self.x_buffer), np.array(self.data_buffer))
-
 
 
 def main():
