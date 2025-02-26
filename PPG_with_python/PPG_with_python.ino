@@ -137,7 +137,8 @@
      Serial.println("ERROR: Sensor not found. Check wiring!");
      while (1);
    }
- 
+   //Send reset message
+   Serial.println("RESET");
    // Print current parameters on startup
    Serial.println("\nCurrent Parameters:");
    Serial.print("Sampling Rate: ");
