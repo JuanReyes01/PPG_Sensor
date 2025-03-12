@@ -21,7 +21,7 @@ plot(ppg$`Time (s)`, ppg$`PPG Value`, type = "l")
 ### View first few sec of data (0 to 5 seconds)
 plot(ppg$`Time (s)`, ppg$`PPG Value`, type = "l", xlim = c(0, 5))
 
-## cut duplicated data from the file
+## cut data from the file
 ppg <- ppg %>% filter(`Time (s)` > 4)
 
 

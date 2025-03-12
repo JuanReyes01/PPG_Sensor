@@ -13,9 +13,11 @@ import pyqtgraph as pg
 from pyqtgraph.Qt import QtWidgets, QtCore
 
 #################################  parameters you might need to change based on your Arduino code       #################################################
-port = 'COM4'             # Change this to the port name of the Arduino you are using.
+port = 'COM10'             # Change this to the port name of the Arduino you are using.
 baudrate = 115200         # Change to the Baudrate you are using in the Arduino code.
-sample_rate = 400         # Actual sampling rate [50, 100, 200, 400, 800, 1000, 1600, 3200]
+file_name = 'ppg_data.csv' # Change this to the name of the CSV file you want to save the data to.
+################################# After further testing, this do not do much leave them as they are      ##############################################
+sample_rate = 100         # Actual sampling rate [50, 100, 200, 400, 800, 1000, 1600, 3200]
 average_count = 1         # Sample average count [1, 2, 4, 8, 16, 32]
 pulse_width = 18          # Pulse width [15, 16, 17, 18]
 #################################   end of parameters you need to edit       ################################################################################
@@ -264,7 +266,7 @@ def main():
 
     # Create and start threads.
     serial_thread = SerialThread(csv_queue, plot_queue, message_queue, command_queue)
-    csv_thread = CSVThread(csv_queue)
+    csv_thread = CSVThread(csv_queue, file_name)
     message_thread = MessageThread(message_queue)
 
     serial_thread.start()
